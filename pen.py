@@ -10,7 +10,7 @@ class Pen:
 		return self.Robot != None
 
 	def waitForConn(stopQ):
-		while (not self.ready()) or stopQ.empty():
+		while (not self.ready()) and stopQ.empty():
 			if len(self.robotList) > 1:
 				self.robot = self.robotList[1]
 			time.sleep(0.2)

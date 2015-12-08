@@ -9,16 +9,16 @@ import sys
 import signal
 import threading
 import time
-# import Tkinter as tk
-import Queue
-import control
 import numpy
 import ast
-
 import cv2
+# import Tkinter as tk
+import Queue
+
+import control
+import pen
 
 from ar_markers.hamming.detect import detect_markers
-
 from HamsterAPI.comm_ble import RobotComm
 #from HamsterAPI.comm_usb import RobotComm
 # import draw
@@ -185,7 +185,9 @@ def main_thread():
     capture.release()
     cv2.destroyAllWindows()
 
-def command(paths):
+def command(paths, robotList):
+    marker = pen.Pen(robotList)
+    marker.waitForConn(gQuit)
 
     for path in paths:
         startLoc = path[0]
@@ -286,7 +288,7 @@ def main(argv=None):
     behavior_threads.append(threading.Thread(target=arm, args=(robotList, )))
     behavior_threads.append(threading.Thread(target=timer))
     behavior_threads.append(threading.Thread(target=traveler))
-    behavior_threads.append(threading.Thread(target=command, args=(paths, )))
+    behavior_threads.append(threading.Thread(target=command, args=(paths, robotList)))
 
     for thread in behavior_threads:
         thread.daemon = True
