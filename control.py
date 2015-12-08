@@ -46,7 +46,7 @@ def getError(start, end, curr):
 	if projMag > pathMag - closeThresh:
 		return err, 2
 
-	thresh = 10.0
+	thresh = 5.0
 	# if we are too far off:
 	if (err > thresh):
 		# figure out left or right

@@ -85,7 +85,7 @@ def timer():
     while gQuit.empty():
         if not timeQ.empty():
             timeQ.get()
-            time.sleep(0.5)
+            time.sleep(1.0)
             armQ.put("DONE")
         time.sleep(0.1)
     print "Closing timer"
@@ -102,29 +102,30 @@ def traveler():
 def lift_pen(robotList):
     timeQ.put("START")
     while armQ.empty() and gQuit.empty():
-        robotList[1].set_wheel(0, 10)
-        robotList[1].set_wheel(1, 10)
+        robotList[1].set_wheel(0, 30)
+        robotList[1].set_wheel(1, 30)
     armQ.get()
 
 def lower_pen(robotList):
     timeQ.put("START")
     while armQ.empty() and gQuit.empty():
-        robotList[1].set_wheel(0, -10)
-        robotList[1].set_wheel(1, -10)
+        robotList[1].set_wheel(0, -30)
+        robotList[1].set_wheel(1, -30)
     armQ.get()
 
 def get_to_point(point):
-    drawList.append(point)
+    #drawList.append(point)
     rotate_towards_point(point)
     move_to_point(point)
 
 def rotate_towards_point(point):
     (location, rotation) = infoQ.get()
-    drawList.append(location)
+    #drawList.append((int(location[0]), int(location[1])))
     angle = control.getAngle(location, point)
+    print 'Angle to Point: ' + str(angle)
     while (abs(rotation - angle) > 2) and gQuit.empty():
-        print "Angle: " + str(angle)
-        print "Rotation: " + str(rotation)
+        #print "Angle: " + str(angle)
+        #print "Rotation: " + str(rotation)
         if driveQ.empty():
             driveQ.put([-5, 5])
         (location, rotation) = infoQ.get()
@@ -142,9 +143,9 @@ def move_to_point(point):
         if dir == -1:
             driveQ.put([10,10])
         elif dir == 1:
-            driveQ.put([12,8])
+            driveQ.put([11,9])
         elif dir == 0:
-            driveQ.put([8,12])
+            driveQ.put([9,11])
         try:
             (location, rotation) = infoQ.get(False)
         except Queue.Empty:
@@ -164,7 +165,7 @@ def main_thread():
         markers = detect_markers(frame)
         for marker in markers:
             marker.highlite_marker(frame)
-            marker.print_center()
+            #marker.print_center()
             location, rotation = marker.get_location_rotation()
             # if not infoQ.empty():
             #     infoQ.get()
@@ -184,17 +185,35 @@ def main_thread():
     capture.release()
     cv2.destroyAllWindows()
 
-def command():
-    pointA = (900, 300)
-    armQ.put("LOWER")
-    get_to_point(pointA)
+def command(paths):
+
+    for path in paths:
+        startLoc = path[0]
+        # armQ.put("LIFT")
+        get_to_point(startLoc)
+        for i in range(1, len(path)):
+            destLoc = path[i]
+            print 'Destination: ' + str(destLoc)
+            rotate_towards_point(destLoc)
+            # armQ.put("LOWER")
+            move_to_point(destLoc)
+            # armQ.put("LIFT")
+
+
+    # pointA = (900, 300)
+    # armQ.put("LOWER")
+    # get_to_point(pointA)
 
     # time.sleep(15)
     # print "START COMMAND"
-    # driveQ.put([-5,-5])
-    # armQ.put("LIFT")
-    # time.sleep(0.5)
-    # armQ.put("LOWER")
+    # driveQ.put([5,5])
+    # while gQuit.empty():
+    #     print 'lifting'
+    #     armQ.put("LIFT")
+    #     time.sleep(3)
+    #     print 'lowering'
+    #     armQ.put("LOWER")
+    #     time.sleep(3)
     # driveQ.put([0,0])
 
     print "Closing command"
@@ -215,9 +234,10 @@ def getPaths(camWidth, camHeight, camXOffset, camYOffset):
             if len(item) < 3:
                 continue
             point = ast.literal_eval(item)
-            newX = point[0] * ratio + camXOffset
-            newY = point[1] * ratio + camYOffset
+            newX = int(point[0] * ratio + camXOffset)
+            newY = int(point[1] * ratio + camYOffset)
             path.append((newX, newY))
+            drawList.append((newX, newY))
 
         paths.append(path)
     return paths
@@ -233,7 +253,7 @@ def main(argv=None):
     drawList.append((1500, 800))
 
     # instantiate COMM object
-    comm = RobotComm(2, -50) #maxRobot = 1, minRSSI = -50
+    comm = RobotComm(1, -50) #maxRobot = 1, minRSSI = -50
     if comm.start():
         print 'Communication starts'
     else:
@@ -266,7 +286,7 @@ def main(argv=None):
     behavior_threads.append(threading.Thread(target=arm, args=(robotList, )))
     behavior_threads.append(threading.Thread(target=timer))
     behavior_threads.append(threading.Thread(target=traveler))
-    behavior_threads.append(threading.Thread(target=command))
+    behavior_threads.append(threading.Thread(target=command, args=(paths, )))
 
     for thread in behavior_threads:
         thread.daemon = True

@@ -293,6 +293,7 @@ def combinePath(path, smoothFactor):
     # length = len(path)
     start = 0
     end = 3
+    path.append(path[0])
     while end < len(path):
         while end < len(path) and isStraight(path[start:end], smoothFactor):
             end = end + 1
@@ -319,6 +320,6 @@ def saveToFile(filename, paths, width, height):
     for path in paths:
         pathString = ""
         for edge in path:
-            pathString = pathString + "(" + str(edge[0][0]) + "," + str(edge[0][1]) + ") "
-        pathString = pathString + "(" + str(path[0][0][0]) + "," + str(path[0][0][1]) + ")\n"
+            pathString = pathString + "(" + str(edge[0][1]) + "," + str(edge[0][0]) + ") "
+        pathString = pathString + "\n"
         f.write(pathString)
