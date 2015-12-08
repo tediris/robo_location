@@ -43,17 +43,20 @@ class HammingMarker(object):
         cv2.putText(img, str(self.id), self.center, cv2.FONT_HERSHEY_SIMPLEX, 2, text_color)
 
     def get_location_rotation(self):
-        xMean = 0
-        yMean = 0
-        numPoints = len(self.contours)
-        for point in self.contours:
-            xMean += point[0][0]
-            yMean += point[0][1]
-
-        xMean = xMean / numPoints
-        yMean = yMean / numPoints
+        # xMean = 0
+        # yMean = 0
+        # numPoints = len(self.contours)
+        # for point in self.contours:
+        #     xMean += point[0][0]
+        #     yMean += point[0][1]
+        #
+        # xMean = xMean / numPoints
+        # yMean = yMean / numPoints
+        M = cv2.moments(self.contours)
+        cx = int(M['m10']/M['m00'])
+        cy = int(M['m01']/M['m00'])
         rotation = self.fix_rotation()
-        return (xMean, yMean), rotation
+        return (cx, cy), rotation
 
     def fix_rotation(self):
         angle = self.rotation

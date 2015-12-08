@@ -30,7 +30,7 @@ gBehaviors = {}
 armQ = Queue.Queue()
 timeQ = Queue.Queue()
 driveQ = Queue.Queue()
-infoQ = Queue.Queue()
+infoQ = Queue.LifoQueue()
 travelQ = Queue.Queue()
 doneQ = Queue.Queue()
 drawList = []
@@ -139,6 +139,7 @@ def move_to_point(point):
     start = location
     error, dir = control.getError(start, point, location)
     #travelQ.
+    drawList.append(location)
     while (not dir == 2) and gQuit.empty() and doneQ.empty():
         if dir == -1:
             driveQ.put([10,10])
@@ -151,6 +152,7 @@ def move_to_point(point):
         except Queue.Empty:
             pass
         error, dir = control.getError(start, point, location)
+        drawList[-1] = location
         time.sleep(0.1)
     driveQ.put([0,0])
 
@@ -188,18 +190,19 @@ def main_thread():
 def command(paths, robotList):
     marker = pen.Pen(robotList)
     marker.waitForConn(gQuit)
+    time.sleep(2)
 
+    marker.lift()
     for path in paths:
         startLoc = path[0]
-        # armQ.put("LIFT")
         get_to_point(startLoc)
         for i in range(1, len(path)):
             destLoc = path[i]
             print 'Destination: ' + str(destLoc)
             rotate_towards_point(destLoc)
-            # armQ.put("LOWER")
+            marker.lower()
             move_to_point(destLoc)
-            # armQ.put("LIFT")
+            marker.lift()
 
 
     # pointA = (900, 300)
@@ -208,7 +211,7 @@ def command(paths, robotList):
 
     # time.sleep(15)
     # print "START COMMAND"
-    # driveQ.put([5,5])
+    # driveQ.put([-5,-5])
     # while gQuit.empty():
     #     print 'lifting'
     #     armQ.put("LIFT")
@@ -255,7 +258,7 @@ def main(argv=None):
     drawList.append((1500, 800))
 
     # instantiate COMM object
-    comm = RobotComm(1, -50) #maxRobot = 1, minRSSI = -50
+    comm = RobotComm(2, -50) #maxRobot = 1, minRSSI = -50
     if comm.start():
         print 'Communication starts'
     else:
@@ -285,7 +288,7 @@ def main(argv=None):
     # start behavior threads using list
     behavior_threads = []
     behavior_threads.append(threading.Thread(target=drive, args=(robotList, )))
-    behavior_threads.append(threading.Thread(target=arm, args=(robotList, )))
+    #behavior_threads.append(threading.Thread(target=arm, args=(robotList, )))
     behavior_threads.append(threading.Thread(target=timer))
     behavior_threads.append(threading.Thread(target=traveler))
     behavior_threads.append(threading.Thread(target=command, args=(paths, robotList)))

@@ -33,6 +33,11 @@ def getError(start, end, curr):
 	if (pathMag != 0):
 		pathDir = (1/pathMag) * path
 
+	# if we've gone too far already, stop
+	distMag = norm(location)
+	if distMag > pathMag:
+		return 10, 2
+
 	# project the robot pos vector onto the direction
 	projMag = numpy.dot(location, pathDir)
 	proj = projMag * pathDir

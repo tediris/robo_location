@@ -1,13 +1,13 @@
 import time
 
 class Pen:
-	def __init__(self, robotList, moveDuration = 1):
+	def __init__(self, robotList, moveDuration = 3.5):
 		self.robotList = robotList
 		self.robot = None
 		self.sleep_time = moveDuration
 
 	def ready(self):
-		return self.Robot != None
+		return self.robot != None
 
 	def waitForConn(self, stopQ):
 		while (not self.ready()) and stopQ.empty():
@@ -19,9 +19,9 @@ class Pen:
 		if not self.ready():
 			print 'pen not ready'
 			return
-		self.robot.set_wheel(0, -10)
-		self.robot.set_wheel(1, -10)
-		time.sleep(self.sleep_time)
+		self.robot.set_wheel(0, 10)
+		self.robot.set_wheel(1, 10)
+		time.sleep(self.sleep_time + 1.0)
 		self.robot.set_wheel(0, 0)
 		self.robot.set_wheel(1, 0)
 
@@ -29,8 +29,8 @@ class Pen:
 		if not self.ready():
 			print 'pen not ready'
 			return
-		self.robot.set_wheel(0, 10)
-		self.robot.set_wheel(1, 10)
+		self.robot.set_wheel(0, -10)
+		self.robot.set_wheel(1, -10)
 		time.sleep(self.sleep_time)
 		self.robot.set_wheel(0, 0)
 		self.robot.set_wheel(1, 0)
