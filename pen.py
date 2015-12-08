@@ -6,7 +6,7 @@ class Pen:
 		self.robot = None
 		self.sleep_time = moveDuration
 
-	def ready():
+	def ready(self):
 		return self.Robot != None
 
 	def waitForConn(self, stopQ):
