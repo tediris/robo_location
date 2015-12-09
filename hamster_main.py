@@ -49,20 +49,6 @@ def signal_handler(signal, frame):
     print 'You pressed Ctrl+C!'
     clean_up()
 
-def lift_pen(robotList):
-    timeQ.put("START")
-    while armQ.empty() and gQuit.empty():
-        robotList[1].set_wheel(0, 30)
-        robotList[1].set_wheel(1, 30)
-    armQ.get()
-
-def lower_pen(robotList):
-    timeQ.put("START")
-    while armQ.empty() and gQuit.empty():
-        robotList[1].set_wheel(0, -30)
-        robotList[1].set_wheel(1, -30)
-    armQ.get()
-
 def get_to_point(point, wheels):
     #drawList.append(point)
     rotate_towards_point(point, wheels)
@@ -124,21 +110,10 @@ def main_thread():
             marker.highlite_marker(frame)
             location, rotation = marker.get_location_rotation()
             info.append((location, rotation))
-        # markers = detect_markers(frame)
-        # for marker in markers:
-        #     marker.highlite_marker(frame)
-        #     #marker.print_center()
-        #     location, rotation = marker.get_location_rotation()
-        #     # if not infoQ.empty():
-        #     #     infoQ.get()
-        #     #infoQ.put((location, rotation))
-        #     info.append((location, rotation))
         for item in drawList:
             cv2.circle(frame, item, 5, (0,255,255), 4)
-        # print frame.shape, frame.dtype
-        # m = numpy.zeros(size, dtype=numpy.uint8)
-        #frameSmall = cv2.resize(frame, size)
-        cv2.imshow('Test Frame', frame)
+        frameSmall = cv2.resize(frame, size)
+        cv2.imshow('Test Frame', frameSmall)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
         frame_captured, frame = capture.read()
@@ -157,6 +132,7 @@ def command(paths, robotList):
     marker.lower()
 
     marker.lift()
+    # unaligned drawing, faster
     for path in paths:
         startLoc = path[0]
         get_to_point(startLoc, wheels)
@@ -167,6 +143,26 @@ def command(paths, robotList):
             marker.lower()
             move_to_point(destLoc, wheels)
             marker.lift()
+            # move to the new point
+
+    # aligned drawing, slower but more accurate
+    # for path in paths:
+    #     startLoc = path[0]
+    #     for i in range(0, len(path) - 1):
+    #         vecToPoint = numpy.array(path[i + 1]) - numpy.array(path[i])
+    #         unitVec = (1 / numpy.linalg.norm(vecToPoint)) * vecToPoint
+    #         offset = unitVec * 20
+    #         startLoc = tuple(numpy.add(path[i], offset))
+    #         destLoc = tuple(numpy.add(path[i + 1], offset))
+    #         get_to_point(startLoc, wheels)
+    #         #if (i == 0):
+    #         rotate_towards_point(destLoc, wheels)
+    #         #else:
+    #         #    rotate_towards_point(destLoc, wheels, "right")
+    #         marker.lower()
+    #         move_to_point(destLoc, wheels)
+    #         marker.lift()
+    #         # move to the new point
 
     print "Closing command"
 
