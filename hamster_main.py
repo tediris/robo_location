@@ -14,12 +14,13 @@ import ast
 import cv2
 # import Tkinter as tk
 import Queue
+from collections import deque
 
 import control
 import pen
 import drive
 
-from ar_markers.hamming.detect import detect_markers
+from ar_markers.hamming.detect import detect_marker
 from HamsterAPI.comm_ble import RobotComm
 #from HamsterAPI.comm_usb import RobotComm
 # import draw
@@ -28,13 +29,9 @@ from HamsterAPI.comm_ble import RobotComm
 gFrame = None
 gQuit = Queue.Queue()
 gBehaviors = {}
-armQ = Queue.Queue()
-timeQ = Queue.Queue()
-driveQ = Queue.Queue()
-infoQ = Queue.LifoQueue()
-travelQ = Queue.Queue()
-doneQ = Queue.Queue()
 drawList = []
+
+info = deque(maxlen=1)
 
 def quit():
     print "quitting..."
@@ -51,40 +48,6 @@ def clean_up():
 def signal_handler(signal, frame):
     print 'You pressed Ctrl+C!'
     clean_up()
-
-def arm(robotList):
-    while gQuit.empty():
-        if len(robotList) > 1:
-            # lift_pen(robotList)
-            # lower_pen(robotList)
-            if not armQ.empty():
-                command = armQ.get()
-                if command == "LIFT":
-                    lift_pen(robotList)
-                elif command == "LOWER":
-                    lower_pen(robotList)
-            robotList[1].set_wheel(0, 0)
-            robotList[1].set_wheel(1, 0)
-        time.sleep(0.1)
-    print "Closing arm"
-
-def timer():
-    while gQuit.empty():
-        if not timeQ.empty():
-            timeQ.get()
-            time.sleep(1.0)
-            armQ.put("DONE")
-        time.sleep(0.1)
-    print "Closing timer"
-
-def traveler():
-    while gQuit.empty():
-        if not travelQ.empty():
-            travelTime = travelQ.get()
-            time.sleep(travelTime)
-            doneQ.put("DONE")
-        time.sleep(0.1)
-    print "Closing traveler"
 
 def lift_pen(robotList):
     timeQ.put("START")
@@ -106,27 +69,30 @@ def get_to_point(point, wheels):
     move_to_point(point, wheels)
 
 def rotate_towards_point(point, wheels):
-    (location, rotation) = infoQ.get()
+    print "ROTATING"
+    while len(info) == 0:
+        time.sleep(0.1)
+    (location, rotation) = info.pop()#infoQ.get()
     #drawList.append((int(location[0]), int(location[1])))
     angle = control.getAngle(location, point)
-    print 'Angle to Point: ' + str(angle)
     wheels.drive(-5, 5)
     while (abs(rotation - angle) > 2) and gQuit.empty():
         #print "Angle: " + str(angle)
         #print "Rotation: " + str(rotation)
-        (location, rotation) = infoQ.get()
+        while len(info) == 0:
+            time.sleep(0.1)
+        (location, rotation) = info.pop()#infoQ.get()
     wheels.stop()
 
 def move_to_point(point, wheels):
-    while not doneQ.empty():
-        doneQ.get()
     print "MOVE FORWARD"
-    (location, rotation) = infoQ.get()
+    while len(info) == 0:
+        time.sleep(0.1)
+    (location, rotation) = info.pop()#infoQ.get()
     start = location
     error, dir = control.getError(start, point, location)
-    #travelQ.
-    drawList.append(location)
-    while (not dir == 2) and gQuit.empty() and doneQ.empty():
+    #drawList.append(location)
+    while (not dir == 2) and gQuit.empty():
         if dir == -1:
             wheels.drive(10, 10)
         elif dir == 1:
@@ -134,15 +100,18 @@ def move_to_point(point, wheels):
         elif dir == 0:
             wheels.drive(9, 11)
         try:
-            (location, rotation) = infoQ.get(False)
+            while len(info) == 0:
+                time.sleep(0.1)
+            (location, rotation) = info.pop()#infoQ.get(False)
         except Queue.Empty:
             pass
         error, dir = control.getError(start, point, location)
-        drawList[-1] = location
+        #drawList[-1] = location
         time.sleep(0.1)
     wheels.stop()
 
 def main_thread():
+    size = (960, 540)
     capture = cv2.VideoCapture(0)
 
     if capture.isOpened(): # try to get the first frame
@@ -150,25 +119,30 @@ def main_thread():
     else:
         frame_captured = False
     while frame_captured and gQuit.empty():
-        markers = detect_markers(frame)
-        for marker in markers:
+        marker = detect_marker(frame)
+        if marker != None:
             marker.highlite_marker(frame)
-            #marker.print_center()
             location, rotation = marker.get_location_rotation()
-            # if not infoQ.empty():
-            #     infoQ.get()
-            infoQ.put((location, rotation))
+            info.append((location, rotation))
+        # markers = detect_markers(frame)
+        # for marker in markers:
+        #     marker.highlite_marker(frame)
+        #     #marker.print_center()
+        #     location, rotation = marker.get_location_rotation()
+        #     # if not infoQ.empty():
+        #     #     infoQ.get()
+        #     #infoQ.put((location, rotation))
+        #     info.append((location, rotation))
         for item in drawList:
             cv2.circle(frame, item, 5, (0,255,255), 4)
         # print frame.shape, frame.dtype
-        size = (960, 540)
         # m = numpy.zeros(size, dtype=numpy.uint8)
-        frameSmall = cv2.resize(frame, size)
-        cv2.imshow('Test Frame', frameSmall)
+        #frameSmall = cv2.resize(frame, size)
+        cv2.imshow('Test Frame', frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
         frame_captured, frame = capture.read()
-        # time.sleep(0.1)
+        time.sleep(0.01)
     # When everything done, release the capture
     capture.release()
     cv2.destroyAllWindows()
@@ -194,23 +168,6 @@ def command(paths, robotList):
             move_to_point(destLoc, wheels)
             marker.lift()
 
-
-    # pointA = (900, 300)
-    # armQ.put("LOWER")
-    # get_to_point(pointA)
-
-    # time.sleep(15)
-    # print "START COMMAND"
-    # driveQ.put([-5,-5])
-    # while gQuit.empty():
-    #     print 'lifting'
-    #     armQ.put("LIFT")
-    #     time.sleep(3)
-    #     print 'lowering'
-    #     armQ.put("LOWER")
-    #     time.sleep(3)
-    # driveQ.put([0,0])
-
     print "Closing command"
 
 def getPaths(camWidth, camHeight, camXOffset, camYOffset):
@@ -235,6 +192,7 @@ def getPaths(camWidth, camHeight, camXOffset, camYOffset):
             drawList.append((newX, newY))
 
         paths.append(path)
+    f.close()
     return paths
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -255,43 +213,22 @@ def main(argv=None):
         print 'Error: communication'
         return
 
-    # instanciate Robot
+    # instantiate Robot
     robotList = comm.get_robotList()
-
-    # global gFrame
-    # gFrame = tk.Tk()
-    # gFrame.geometry('600x500')
-    #gFrame.focus_set()
-    #gFrame.bind('<KeyPress>', joystick)
-
-    # gRobotDraw = draw.RobotDraw(gFrame, tk)
 
     # create behaviors using set
     global gBehaviors
     gBehaviors = {}
-    # gBehaviors[0] = color.Behavior("color", robotList)
-    # gBehaviors[1] = sound.Behavior("sound", robotList)
-    # gBehaviors[2] = motion.Behavior("motion", robotList, 10)
-    # gBehaviors[3] = proxy.Behavior("proxy", robotList, 85, 0.01, gRobotDraw.get_queue())
-    # gBehaviors[0] = scanning.Behavior("scanning", robotList, 16.0, gRobotDraw.get_queue())
 
     # start behavior threads using list
     behavior_threads = []
-    #behavior_threads.append(threading.Thread(target=drive, args=(robotList, )))
-    #behavior_threads.append(threading.Thread(target=arm, args=(robotList, )))
-    #behavior_threads.append(threading.Thread(target=timer))
-    behavior_threads.append(threading.Thread(target=traveler))
     behavior_threads.append(threading.Thread(target=command, args=(paths, robotList)))
 
     for thread in behavior_threads:
         thread.daemon = True
         thread.start()
 
-    # gRobotDraw.start()
-    # gFrame.mainloop()
-
-    # paths.append()
-
+    # start the cv thread
     main_thread()
 
     for behavior in behavior_threads:

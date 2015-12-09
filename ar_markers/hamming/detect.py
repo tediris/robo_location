@@ -40,6 +40,52 @@ def validate_and_turn(marker):
     marker = rot90(marker, k=rotation)
     return marker, rotation * 90
 
+def detect_marker(img):
+    width, height, _ = img.shape
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    edges = cv2.Canny(gray, 10, 100)
+    contours, hierarchy = cv2.findContours(edges.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+
+    # We only keep the long enough contours
+    min_contour_length = min(width, height) / 50
+    contours = [contour for contour in contours if len(contour) > min_contour_length]
+    warped_size = 49
+    canonical_marker_coords = array(((0, 0),
+                                     (warped_size - 1, 0),
+                                     (warped_size - 1, warped_size - 1),
+                                     (0, warped_size - 1)),
+                                    dtype='float32')
+
+    for contour in contours:
+        approx_curve = cv2.approxPolyDP(contour, len(contour) * 0.01, True)
+        if not (len(approx_curve) == 4 and cv2.isContourConvex(approx_curve)):
+            continue
+
+        sorted_curve = array(cv2.convexHull(approx_curve, clockwise=False),
+                             dtype='float32')
+        persp_transf = cv2.getPerspectiveTransform(sorted_curve, canonical_marker_coords)
+        warped_img = cv2.warpPerspective(img, persp_transf, (warped_size, warped_size))
+        warped_gray = cv2.cvtColor(warped_img, cv2.COLOR_BGR2GRAY)
+
+        _, warped_bin = cv2.threshold(warped_gray, 127, 255, cv2.THRESH_BINARY)
+        marker = warped_bin.reshape(
+            [MARKER_SIZE, warped_size / MARKER_SIZE, MARKER_SIZE, warped_size / MARKER_SIZE]
+        )
+        marker = marker.mean(axis=3).mean(axis=1)
+        marker[marker < 127] = 0
+        marker[marker >= 127] = 1
+
+        try:
+            marker, rot = validate_and_turn(marker)
+            marker_id = 10
+            a = persp_transf[0][0]
+            b = persp_transf[0][1]
+            angle = math.degrees(math.atan2(-b, a))
+            return HammingMarker(id=marker_id, contours=approx_curve, rotation=(rot + angle))
+        except ValueError:
+            continue
+    return None
 
 def detect_markers(img):
     width, height, _ = img.shape
@@ -80,8 +126,9 @@ def detect_markers(img):
 
         try:
             marker, rot = validate_and_turn(marker)
-            hamming_code = extract_hamming_code(marker)
-            marker_id = int(decode(hamming_code), 2)
+            #hamming_code = extract_hamming_code(marker)
+            marker_id = 10
+            #marker_id = int(decode(hamming_code), 2)
             a = persp_transf[0][0]
             b = persp_transf[0][1]
             angle = math.degrees(math.atan2(-b, a))
