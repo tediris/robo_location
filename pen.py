@@ -1,7 +1,7 @@
 import time
 
 class Pen:
-	def __init__(self, robotList, moveDuration = 3.5):
+	def __init__(self, robotList, moveDuration = 3.0):
 		self.robotList = robotList
 		self.robot = None
 		self.sleep_time = moveDuration
@@ -31,6 +31,6 @@ class Pen:
 			return
 		self.robot.set_wheel(0, -10)
 		self.robot.set_wheel(1, -10)
-		time.sleep(self.sleep_time)
+		time.sleep(self.sleep_time - 1.0)
 		self.robot.set_wheel(0, 0)
 		self.robot.set_wheel(1, 0)

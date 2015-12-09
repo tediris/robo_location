@@ -17,6 +17,7 @@ import Queue
 
 import control
 import pen
+import drive
 
 from ar_markers.hamming.detect import detect_markers
 from HamsterAPI.comm_ble import RobotComm
@@ -50,20 +51,6 @@ def clean_up():
 def signal_handler(signal, frame):
     print 'You pressed Ctrl+C!'
     clean_up()
-
-def drive(robotList):
-    print "DRIVE"
-
-    drive = [0,0]
-
-    while gQuit.empty():
-        if len(robotList) > 0:
-            robotList[0].set_wheel(0,drive[0])
-            robotList[0].set_wheel(1,drive[1])
-        if not driveQ.empty():
-            drive = driveQ.get()
-        time.sleep(0.1)
-    print "Closing drive"
 
 def arm(robotList):
     while gQuit.empty():
@@ -113,25 +100,24 @@ def lower_pen(robotList):
         robotList[1].set_wheel(1, -30)
     armQ.get()
 
-def get_to_point(point):
+def get_to_point(point, wheels):
     #drawList.append(point)
-    rotate_towards_point(point)
-    move_to_point(point)
+    rotate_towards_point(point, wheels)
+    move_to_point(point, wheels)
 
-def rotate_towards_point(point):
+def rotate_towards_point(point, wheels):
     (location, rotation) = infoQ.get()
     #drawList.append((int(location[0]), int(location[1])))
     angle = control.getAngle(location, point)
     print 'Angle to Point: ' + str(angle)
+    wheels.drive(-5, 5)
     while (abs(rotation - angle) > 2) and gQuit.empty():
         #print "Angle: " + str(angle)
         #print "Rotation: " + str(rotation)
-        if driveQ.empty():
-            driveQ.put([-5, 5])
         (location, rotation) = infoQ.get()
-    driveQ.put([0,0])
+    wheels.stop()
 
-def move_to_point(point):
+def move_to_point(point, wheels):
     while not doneQ.empty():
         doneQ.get()
     print "MOVE FORWARD"
@@ -142,11 +128,11 @@ def move_to_point(point):
     drawList.append(location)
     while (not dir == 2) and gQuit.empty() and doneQ.empty():
         if dir == -1:
-            driveQ.put([10,10])
+            wheels.drive(10, 10)
         elif dir == 1:
-            driveQ.put([11,9])
+            wheels.drive(11, 9)
         elif dir == 0:
-            driveQ.put([9,11])
+            wheels.drive(9, 11)
         try:
             (location, rotation) = infoQ.get(False)
         except Queue.Empty:
@@ -154,7 +140,7 @@ def move_to_point(point):
         error, dir = control.getError(start, point, location)
         drawList[-1] = location
         time.sleep(0.1)
-    driveQ.put([0,0])
+    wheels.stop()
 
 def main_thread():
     capture = cv2.VideoCapture(0)
@@ -188,20 +174,24 @@ def main_thread():
     cv2.destroyAllWindows()
 
 def command(paths, robotList):
+    wheels = drive.Drive(robotList)
+    wheels.waitForConn(gQuit)
+
     marker = pen.Pen(robotList)
     marker.waitForConn(gQuit)
     time.sleep(2)
+    marker.lower()
 
     marker.lift()
     for path in paths:
         startLoc = path[0]
-        get_to_point(startLoc)
+        get_to_point(startLoc, wheels)
         for i in range(1, len(path)):
             destLoc = path[i]
             print 'Destination: ' + str(destLoc)
-            rotate_towards_point(destLoc)
+            rotate_towards_point(destLoc, wheels)
             marker.lower()
-            move_to_point(destLoc)
+            move_to_point(destLoc, wheels)
             marker.lift()
 
 
@@ -287,9 +277,9 @@ def main(argv=None):
 
     # start behavior threads using list
     behavior_threads = []
-    behavior_threads.append(threading.Thread(target=drive, args=(robotList, )))
+    #behavior_threads.append(threading.Thread(target=drive, args=(robotList, )))
     #behavior_threads.append(threading.Thread(target=arm, args=(robotList, )))
-    behavior_threads.append(threading.Thread(target=timer))
+    #behavior_threads.append(threading.Thread(target=timer))
     behavior_threads.append(threading.Thread(target=traveler))
     behavior_threads.append(threading.Thread(target=command, args=(paths, robotList)))
 
